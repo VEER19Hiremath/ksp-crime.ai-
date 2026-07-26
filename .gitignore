@@ -1,0 +1,41 @@
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+backend/uvicorn.log
+
+# AppSail deploy bundles (vendored site-packages + secrets) — never commit
+backend/appsail-backend/
+backend/appsail-hello/
+backend/.backend.pid
+backend/**/*.restored
+backend/_sample_report.pdf
+
+# raw credentials at project root
+.env
+.catalystrc
+
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/.env.production
+frontend/nextdev.log
+frontend/out/
+
+# Catalyst static-hosting build output
+client/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+_restore/
+presentation/~$*
+~$*.pptx
+~$*.docx
+presentation/*.pptx
+presentation/__pycache__/
+**/__pycache__/
+
+
+frontend/.frontend.pid

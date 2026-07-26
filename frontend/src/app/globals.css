@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #0b1f3a;
+  --navy-deep: #071528;
+  --saffron: #c45c26;
+  --sand: #f7f3eb;
+  --surface: #fffcf7;
+  --border: #e0d8c8;
+  --muted: #5c6b7a;
+  --background: var(--sand);
+  --foreground: var(--navy);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plex);
+  --font-display: var(--font-source-serif);
+}
+
+body {
+  background: var(--sand);
+  color: var(--navy);
+  font-family: var(--font-plex), "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+}
+
+/* Leaflet attribution stays readable on sand surfaces */
+.leaflet-container {
+  font-family: inherit;
+  background: var(--surface);
+}

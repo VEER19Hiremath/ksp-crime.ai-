@@ -1,0 +1,22 @@
+# Slim requirements for Catalyst AppSail (managed Python 3.13, Linux AMD64).
+# Excludes the standalone LiveKit voice-agent worker deps (livekit-agents, av,
+# onnxruntime, livekit rtc) which are NOT imported by the FastAPI app.
+fastapi>=0.115.0
+uvicorn>=0.32.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+google-genai>=1.0.0
+psycopg[binary,pool]>=3.2.0
+neo4j>=5.26.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.0
+PyJWT>=2.9.0
+bcrypt>=4.2.0
+python-multipart>=0.0.12
+reportlab>=4.2.0
+sarvamai>=0.1.0
+websockets>=14.0
+aiohttp>=3.10
+httpx>=0.27.0
+livekit-api>=0.8.0

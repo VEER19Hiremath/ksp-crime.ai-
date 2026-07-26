@@ -1,0 +1,11 @@
+{
+  "appsail": [
+    {
+      "source": "backend\\appsail-backend",
+      "name": "crime-ai-api"
+    }
+  ],
+  "client": {
+    "source": "client"
+  }
+}
