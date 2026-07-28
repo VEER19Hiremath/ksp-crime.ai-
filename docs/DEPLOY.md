@@ -97,19 +97,22 @@ Copy from your local secrets or Catalyst console env when deploying AppSail.
 
 ## 5. Keep Render awake (free tier)
 
-Render free web services sleep after ~15 minutes idle. **Keep-alive is
-frontend-only** — no GitHub Actions:
+Render free web services sleep after ~15 minutes idle. Two automatic pingers:
 
-1. **Browser (automatic)** — root layout mounts
-   [`KeepAlive`](../frontend/src/components/KeepAlive.tsx), which pings
-   `/health` every **5 minutes** on any open tab (login, chat, dashboard, …).
-2. **Optional local script** (if you need the API awake with no browser open):
-   ```bash
-   python scripts/keepalive.py
-   ```
+1. **Frontend tab open** — root layout
+   [`KeepAlive`](../frontend/src/components/KeepAlive.tsx) pings `/health`
+   every 5 minutes.
+2. **No tab open (always-on)** — GitHub Actions
+   [`.github/workflows/keepalive.yml`](../.github/workflows/keepalive.yml)
+   runs every 5 minutes on a schedule (also triggerable manually via
+   **Actions → Keep Render API awake → Run workflow**).
 
-Leave at least one Crime AI tab open during demos. For always-on without a
-browser, upgrade Render off the free plan.
+Optional local backup:
+```bash
+python scripts/keepalive.py
+```
+
+For true always-on without cron hacks, upgrade Render off the free plan.
 
 ## 6. Local tunnel (dev only)
 

@@ -18,9 +18,11 @@ Full architecture: [docs/END_TO_END_PLAN.md](docs/END_TO_END_PLAN.md) · Deploy:
 > runs on Render (or any WS-capable host). The Catalyst frontend points at that
 > API URL via `NEXT_PUBLIC_API_BASE_URL`.
 >
-> **Keep-alive:** any open frontend tab pings `/health` every 5 minutes via
-> [`KeepAlive`](frontend/src/components/KeepAlive.tsx) (no GitHub Actions).
-> Optional local script: [`scripts/keepalive.py`](scripts/keepalive.py).
+> **Keep-alive:**  
+> - Any open frontend tab pings `/health` every 5 min (`KeepAlive` component).  
+> - With **no tab open**, GitHub Actions cron does the same  
+>   ([`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml)).  
+> - Optional local: `python scripts/keepalive.py`
 
 ## Demo logins
 
