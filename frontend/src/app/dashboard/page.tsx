@@ -138,30 +138,87 @@ function DashboardContent() {
   const [selected, setSelected] = useState<InsightDetail | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetchDashboardSummary(),
-      fetchDashboardTrend(),
-      fetchDashboardHotspots(1),
-      fetchDashboardSocio(),
-      fetchEarlyWarnings(8),
-      fetchCrimePatterns(10),
-    ])
-      .then(([s, t, h, so, w, p]) => {
-        setSummary(s);
-        setTrend(t);
-        setHotspots(h);
-        setSocio(so);
-        setWarnings(w.warnings || []);
-        setPatterns(p.patterns || []);
+    let cancelled = false;
+    let pending = 6;
+    setLoading(true);
+    setError(null);
+
+    const doneOne = () => {
+      pending -= 1;
+      if (pending <= 0 && !cancelled) setLoading(false);
+    };
+
+    const failAllCheck = () => {
+      // If everything failed and we still have no summary, show an error.
+      if (!cancelled && pending <= 0) {
+        setSummary((current) => {
+          if (current == null) {
+            setError("Could not reach the backend. Is the API server running?");
+          }
+          return current;
+        });
+      }
+    };
+
+    fetchDashboardSummary()
+      .then((s) => {
+        if (!cancelled) {
+          setSummary(s);
+          setLoading(false); // paint KPI cards immediately
+        }
       })
-      .catch((err) =>
-        setError(
-          err instanceof Error && /failed:\s*401/.test(err.message)
-            ? "Session expired — please sign in again."
-            : "Could not reach the backend. Is the API server running?",
-        ),
-      )
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (
+          !cancelled &&
+          err instanceof Error &&
+          /failed:\s*401/.test(err.message)
+        ) {
+          setError("Session expired — please sign in again.");
+        }
+      })
+      .finally(() => {
+        doneOne();
+        failAllCheck();
+      });
+
+    fetchDashboardTrend()
+      .then((t) => {
+        if (!cancelled) setTrend(t);
+      })
+      .catch(() => undefined)
+      .finally(doneOne);
+
+    fetchDashboardHotspots(1)
+      .then((h) => {
+        if (!cancelled) setHotspots(h);
+      })
+      .catch(() => undefined)
+      .finally(doneOne);
+
+    fetchDashboardSocio()
+      .then((so) => {
+        if (!cancelled) setSocio(so);
+      })
+      .catch(() => undefined)
+      .finally(doneOne);
+
+    fetchEarlyWarnings(8)
+      .then((w) => {
+        if (!cancelled) setWarnings(w.warnings || []);
+      })
+      .catch(() => undefined)
+      .finally(doneOne);
+
+    fetchCrimePatterns(10)
+      .then((p) => {
+        if (!cancelled) setPatterns(p.patterns || []);
+      })
+      .catch(() => undefined)
+      .finally(doneOne);
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const totalCases = summary ? Object.values(summary).reduce((a, b) => a + b, 0) : 0;
@@ -463,7 +520,12 @@ function DashboardContent() {
       </header>
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      {loading && <p className="text-sm text-[var(--muted)]">Loading dashboard…</p>}
+      {loading && !summary && (
+        <p className="text-sm text-[var(--muted)]">Loading dashboard…</p>
+      )}
+      {loading && summary && (
+        <p className="mb-2 text-xs text-[var(--muted)]">Loading remaining charts…</p>
+      )}
 
       <div
         className={`grid gap-4 ${

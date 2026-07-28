@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { wakeApi, startKeepAlivePinger } from "@/lib/api";
 import { clearSession, getFullName, getRole, getToken } from "@/lib/auth";
 
 const NAV_LINKS = [
@@ -20,17 +21,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!getToken()) {
-      router.replace("/login");
-    } else {
-      setAuthChecked(true);
+      router.replace("/login/");
+      return;
     }
+    setAuthChecked(true);
+    // Keep Render + Neon warm while the officer navigates.
+    void wakeApi();
+    // Ping every 5 min so the free-tier API does not sleep mid-session.
+    return startKeepAlivePinger();
   }, [router]);
 
-  if (!authChecked) return null;
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--sand)] text-sm text-[var(--muted)]">
+        Loading…
+      </div>
+    );
+  }
 
   function handleLogout() {
     clearSession();
-    router.replace("/login");
+    router.replace("/login/");
   }
 
   return (
@@ -42,11 +53,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="flex gap-0.5 text-sm">
             {NAV_LINKS.map((link) => {
-              const active = pathname === link.href;
+              const active =
+                link.href === "/"
+                  ? pathname === "/" || pathname === ""
+                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch
                   className={`rounded-md px-2.5 py-1 transition ${
                     active
                       ? "bg-white/15 text-white"

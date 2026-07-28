@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChatTurn,
@@ -9,11 +10,23 @@ import {
   fetchChatHistory,
   fetchChatSessions,
   streamChatMessage,
+  wakeApi,
 } from "@/lib/api";
 import { getRole, getUsername, getFullName, PDF_EXPORT_ROLES } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
-import VoiceCall from "@/components/VoiceCall";
-import CaseNetworkPanel from "@/components/CaseNetworkPanel";
+
+const VoiceCall = dynamic(() => import("@/components/VoiceCall"), {
+  ssr: false,
+  loading: () => null,
+});
+const CaseNetworkPanel = dynamic(() => import("@/components/CaseNetworkPanel"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-md border border-[var(--border)] bg-white/60 p-3 text-xs text-[var(--muted)]">
+      Loading network panel…
+    </div>
+  ),
+});
 
 const TURNS_KEY = (id: string) => `crimeai_turns_${id}`;
 const LOCAL_SESSIONS_KEY = "crimeai_local_sessions";
@@ -225,11 +238,12 @@ function ChatPage() {
   }, []);
 
   const loadSession = useCallback(async (id: string) => {
-    setHistoryLoaded(false);
     setSessionId(id);
     localStorage.setItem("crimeai_session_id", id);
     setError(null);
     const local = readLocalTurns(id);
+    setTurns(local);
+    setHistoryLoaded(true);
     try {
       const data = await fetchChatHistory(id);
       const remote = data.turns || [];
@@ -238,13 +252,12 @@ function ChatPage() {
       writeLocalTurns(id, merged);
       upsertLocalSession(id, merged);
     } catch {
-      setTurns(local);
-    } finally {
-      setHistoryLoaded(true);
+      /* keep local turns */
     }
   }, []);
 
   useEffect(() => {
+    void wakeApi();
     const id = getOrCreateSessionId();
     const saved = localStorage.getItem("crimeai_language");
     if (saved === "kn-IN" || saved === "en-IN") setBotLang(saved);

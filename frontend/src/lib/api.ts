@@ -4,6 +4,111 @@ import { appPath } from "@/lib/paths";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:8000";
 
+/** Shared in-flight warm-up so login / shell / pages don't stampede Render. */
+let wakePromise: Promise<boolean> | null = null;
+let lastWakeAt = 0;
+const WAKE_TTL_MS = 60_000;
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 45_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ping Render + warm Neon. Call on login page mount so cold starts happen
+ * while the user is typing credentials (free-tier Render can take 30–60s).
+ */
+export function wakeApi(force = false): Promise<boolean> {
+  const now = Date.now();
+  if (!force && wakePromise && now - lastWakeAt < WAKE_TTL_MS) {
+    return wakePromise;
+  }
+  lastWakeAt = now;
+  wakePromise = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/health/ready`, {}, 60_000);
+      if (res.ok) return true;
+      const fallback = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 60_000);
+      return fallback.ok;
+    } catch {
+      try {
+        const fallback = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 60_000);
+        return fallback.ok;
+      } catch {
+        return false;
+      }
+    }
+  })();
+  return wakePromise;
+}
+
+/** Lightweight ping — enough to reset Render's idle timer (no DB). */
+export async function pingApi(): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/health`, { cache: "no-store" }, 30_000);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const KEEPALIVE_MS = 5 * 60 * 1000;
+let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+let keepAliveVisHandler: (() => void) | null = null;
+let keepAliveRefCount = 0;
+
+/**
+ * Ping `/health` every 5 minutes while the browser tab is open so Render
+ * free-tier does not spin down mid-session. Reference-counted — safe when
+ * login and AppShell both call it during navigation.
+ */
+export function startKeepAlivePinger(): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  const tick = () => {
+    void pingApi();
+  };
+
+  keepAliveRefCount += 1;
+
+  if (!keepAliveTimer) {
+    tick();
+    keepAliveTimer = setInterval(tick, KEEPALIVE_MS);
+  }
+
+  if (!keepAliveVisHandler) {
+    keepAliveVisHandler = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", keepAliveVisHandler);
+  }
+
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    keepAliveRefCount = Math.max(0, keepAliveRefCount - 1);
+    if (keepAliveRefCount > 0) return;
+    if (keepAliveTimer) {
+      clearInterval(keepAliveTimer);
+      keepAliveTimer = null;
+    }
+    if (keepAliveVisHandler) {
+      document.removeEventListener("visibilitychange", keepAliveVisHandler);
+      keepAliveVisHandler = null;
+    }
+  };
+}
+
 export async function authFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = getToken();
@@ -12,7 +117,7 @@ export async function authFetch(path: string, init: RequestInit = {}) {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  const res = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...init, headers });
   if (res.status === 401 && typeof window !== "undefined") {
     clearSession();
     window.location.href = appPath("/login/");
@@ -21,18 +126,35 @@ export async function authFetch(path: string, init: RequestInit = {}) {
 }
 
 export async function login(username: string, password: string) {
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error(`Login failed: ${res.status}`);
-  return res.json() as Promise<{
-    access_token: string;
-    role: string;
-    full_name: string;
-    username: string;
-  }>;
+  // Prefer a warm instance + warm DB before the credential round-trip.
+  await wakeApi();
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout(
+        `${API_BASE_URL}/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        },
+        60_000,
+      );
+      if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+      return res.json() as Promise<{
+        access_token: string;
+        role: string;
+        full_name: string;
+        username: string;
+      }>;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Retry once after forcing another wake (common after Render spin-down).
+      if (attempt === 0) await wakeApi(true);
+    }
+  }
+  throw lastError ?? new Error("Login failed");
 }
 
 export type ChatSuggestion = { label: string; prompt: string };

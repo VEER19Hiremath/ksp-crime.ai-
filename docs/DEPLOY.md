@@ -95,7 +95,24 @@ Prefer Render for the single production API.
 Keep secrets out of git: `backend/appsail-backend/app-config.json` is gitignored.
 Copy from your local secrets or Catalyst console env when deploying AppSail.
 
-## 5. Local tunnel (dev only)
+## 5. Keep Render awake (free tier)
+
+Render free web services sleep after ~15 minutes idle. This repo has three
+keep-alive options that ping `/health` every **5 minutes**:
+
+1. **Browser (automatic)** — while the login or app tab is open, the frontend
+   calls `startKeepAlivePinger()` (`frontend/src/lib/api.ts`).
+2. **GitHub Actions** — [`.github/workflows/keepalive.yml`](../.github/workflows/keepalive.yml)
+   runs on a cron schedule. Enable Actions on the repo; optionally set secret
+   `KEEP_ALIVE_URL` (defaults to `https://crime-ai-api.onrender.com/health`).
+3. **Local script** — leave a terminal running:
+   ```bash
+   python scripts/keepalive.py
+   ```
+
+For always-on demos without hacks, upgrade the Render service off the free plan.
+
+## 6. Local tunnel (dev only)
 
 For temporary testing without Render, you can expose local `:8000` with
 Cloudflare Tunnel / ngrok and point `NEXT_PUBLIC_API_BASE_URL` at that URL.

@@ -60,3 +60,17 @@ app.include_router(reports.router)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready() -> dict:
+    """Wake the web process and warm the Neon pool (used by the login page)."""
+    db_ok = False
+    try:
+        from core.db import run_read_only_query
+
+        run_read_only_query("SELECT 1 AS ok")
+        db_ok = True
+    except Exception as exc:
+        logger.warning("health/ready db check failed: %s", exc)
+    return {"status": "ok" if db_ok else "degraded", "database": db_ok}

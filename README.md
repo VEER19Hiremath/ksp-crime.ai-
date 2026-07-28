@@ -17,6 +17,11 @@ Full architecture: [docs/END_TO_END_PLAN.md](docs/END_TO_END_PLAN.md) · Deploy:
 > Zoho Catalyst AppSail does **not** support WebSockets. Live voice therefore
 > runs on Render (or any WS-capable host). The Catalyst frontend points at that
 > API URL via `NEXT_PUBLIC_API_BASE_URL`.
+>
+> **Keep-alive:** the UI pings `/health` every 5 min while open; see
+> [`scripts/keepalive.py`](scripts/keepalive.py) and
+> [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) to keep
+> Render awake when nobody has the app open.
 
 ## Demo logins
 

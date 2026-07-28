@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/api";
+import { login, wakeApi, startKeepAlivePinger } from "@/lib/api";
 import { saveSession } from "@/lib/auth";
+
+type ApiStatus = "warming" | "ready" | "slow" | "error";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +13,38 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("warming");
+
+  useEffect(() => {
+    let cancelled = false;
+    const started = Date.now();
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) setApiStatus((s) => (s === "warming" ? "slow" : s));
+    }, 2500);
+    const stopPing = startKeepAlivePinger();
+
+    void wakeApi()
+      .then((ok) => {
+        if (cancelled) return;
+        setApiStatus(ok ? "ready" : "error");
+      })
+      .catch(() => {
+        if (!cancelled) setApiStatus("error");
+      })
+      .finally(() => {
+        window.clearTimeout(slowTimer);
+        // Keep "slow" visible briefly if wake took a long time.
+        if (!cancelled && Date.now() - started > 2500) {
+          setApiStatus((s) => (s === "error" ? s : "ready"));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(slowTimer);
+      stopPing();
+    };
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,11 +60,24 @@ export default function LoginPage() {
       );
       router.replace("/");
     } catch {
-      setError("Invalid username or password.");
+      setError(
+        apiStatus === "error" || apiStatus === "slow"
+          ? "Could not reach the API (Render may be waking up). Wait a few seconds and try again."
+          : "Invalid username or password.",
+      );
     } finally {
       setLoading(false);
     }
   }
+
+  const statusMessage =
+    apiStatus === "warming"
+      ? "Connecting to API…"
+      : apiStatus === "slow"
+        ? "API is waking up (Render free tier can take 30–60s). You can still type your password."
+        : apiStatus === "error"
+          ? "API unreachable — check that Render is up, then retry."
+          : "API ready";
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--navy)] px-4">
@@ -48,13 +95,27 @@ export default function LoginPage() {
           Sign in to query FIRs, explore criminal networks, and review crime trends.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
+        <p
+          className={`mt-3 text-xs ${
+            apiStatus === "ready"
+              ? "text-emerald-700"
+              : apiStatus === "error"
+                ? "text-red-600"
+                : "text-[var(--muted)]"
+          }`}
+          aria-live="polite"
+        >
+          {statusMessage}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
           <label className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
             Username
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
+              autoComplete="username"
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--navy)]"
             />
           </label>
@@ -64,6 +125,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--navy)]"
             />
           </label>
@@ -73,7 +135,11 @@ export default function LoginPage() {
             disabled={loading}
             className="mt-1 rounded-md bg-[var(--navy)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--navy-deep)] disabled:opacity-40"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading
+              ? apiStatus === "slow" || apiStatus === "warming"
+                ? "Signing in (waking server)…"
+                : "Signing in…"
+              : "Sign in"}
           </button>
         </form>
 
