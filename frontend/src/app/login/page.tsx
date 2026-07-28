@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { login, wakeApi, startKeepAlivePinger } from "@/lib/api";
+import { login, wakeApi } from "@/lib/api";
 import { saveSession } from "@/lib/auth";
 
 type ApiStatus = "warming" | "ready" | "slow" | "error";
@@ -21,7 +21,7 @@ export default function LoginPage() {
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) setApiStatus((s) => (s === "warming" ? "slow" : s));
     }, 2500);
-    const stopPing = startKeepAlivePinger();
+    // Keep-alive pings run from root <KeepAlive />; here we only warm DB + show status.
 
     void wakeApi()
       .then((ok) => {
@@ -42,7 +42,6 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
       window.clearTimeout(slowTimer);
-      stopPing();
     };
   }, []);
 

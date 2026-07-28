@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import KeepAlive from "@/components/KeepAlive";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans({
@@ -25,7 +26,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${plex.variable} ${sourceSerif.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+      <body className="flex min-h-full flex-col font-sans">
+        <KeepAlive />
+        {children}
+      </body>
     </html>
   );
 }

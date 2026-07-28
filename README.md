@@ -18,10 +18,9 @@ Full architecture: [docs/END_TO_END_PLAN.md](docs/END_TO_END_PLAN.md) · Deploy:
 > runs on Render (or any WS-capable host). The Catalyst frontend points at that
 > API URL via `NEXT_PUBLIC_API_BASE_URL`.
 >
-> **Keep-alive:** the UI pings `/health` every 5 min while open; see
-> [`scripts/keepalive.py`](scripts/keepalive.py) and
-> [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) to keep
-> Render awake when nobody has the app open.
+> **Keep-alive:** any open frontend tab pings `/health` every 5 minutes via
+> [`KeepAlive`](frontend/src/components/KeepAlive.tsx) (no GitHub Actions).
+> Optional local script: [`scripts/keepalive.py`](scripts/keepalive.py).
 
 ## Demo logins
 

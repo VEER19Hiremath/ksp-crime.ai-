@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { wakeApi, startKeepAlivePinger } from "@/lib/api";
+import { wakeApi } from "@/lib/api";
 import { clearSession, getFullName, getRole, getToken } from "@/lib/auth";
 
 const NAV_LINKS = [
@@ -25,10 +25,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
     setAuthChecked(true);
-    // Keep Render + Neon warm while the officer navigates.
+    // Warm Neon pool once after auth (5-min /health pings live in <KeepAlive />).
     void wakeApi();
-    // Ping every 5 min so the free-tier API does not sleep mid-session.
-    return startKeepAlivePinger();
   }, [router]);
 
   if (!authChecked) {
